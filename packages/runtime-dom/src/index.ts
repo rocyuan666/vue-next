@@ -14,6 +14,7 @@ import {
 } from '@vue/runtime-core'
 import { nodeOps } from './nodeOps'
 import { patchProp } from './patchProp'
+// 从编译器导入，将在prod中摇动树
 // Importing from the compiler, will be tree-shaken in prod
 import {
   isFunction,
@@ -26,6 +27,7 @@ import {
 
 declare module '@vue/reactivity' {
   export interface RefUnwrapBailTypes {
+    // 注意：如果更新此项，请同时更新`types/refBail.d.ts`。
     // Note: if updating this, also update `types/refBail.d.ts`.
     runtimeDOMBailTypes: Node | Window
   }
@@ -33,7 +35,9 @@ declare module '@vue/reactivity' {
 
 const rendererOptions = /*#__PURE__*/ extend({ patchProp }, nodeOps)
 
+// 懒惰地创建渲染器-这使得核心渲染器逻辑树可以摇晃
 // lazy create the renderer - this makes core renderer logic tree-shakable
+// 如果用户仅从Vue导入反应性实用程序。
 // in case the user only imports reactivity utilities from Vue.
 let renderer: Renderer<Element | ShadowRoot> | HydrationRenderer
 
@@ -54,6 +58,7 @@ function ensureHydrationRenderer() {
   return renderer as HydrationRenderer
 }
 
+// 在这里使用显式类型强制转换以避免在汇总的d.ts中调用import（）
 // use explicit type casts here to avoid import() calls in rolled-up d.ts
 export const render = ((...args) => {
   ensureRenderer().render(...args)
@@ -78,6 +83,10 @@ export const createApp = ((...args) => {
 
     const component = app._component
     if (!isFunction(component) && !component.render && !component.template) {
+      // __不安全的__
+      // 原因：可能在DOM模板中执行JS表达式。
+      // 用户必须确保DOM中的模板是可信的。如果是
+      // 模板不应包含任何用户数据。
       // __UNSAFE__
       // Reason: potential execution of JS expressions in in-DOM template.
       // The user must make sure the in-DOM template is trusted. If it's
@@ -98,6 +107,7 @@ export const createApp = ((...args) => {
       }
     }
 
+    // 安装前清除内容
     // clear content before mounting
     container.innerHTML = ''
     const proxy = mount(container, false, container instanceof SVGElement)
@@ -131,6 +141,8 @@ export const createSSRApp = ((...args) => {
 }) as CreateAppFunction<Element>
 
 function injectNativeTagCheck(app: App) {
+  // 插入`isNativeTag`
+  // 这用于组件名称验证（仅限dev）
   // Inject `isNativeTag`
   // this is used for component name validation (dev only)
   Object.defineProperty(app.config, 'isNativeTag', {
@@ -139,6 +151,7 @@ function injectNativeTagCheck(app: App) {
   })
 }
 
+// 仅dev
 // dev only
 function injectCompilerOptionsCheck(app: App) {
   if (isRuntimeOnly()) {
@@ -202,6 +215,7 @@ function normalizeContainer(
   return container as any
 }
 
+// 自定义元素支持
 // Custom element support
 export {
   defineCustomElement,
@@ -210,10 +224,12 @@ export {
   VueElementConstructor
 } from './apiCustomElement'
 
+// SFC CSS实用程序
 // SFC CSS utilities
 export { useCssModule } from './helpers/useCssModule'
 export { useCssVars } from './helpers/useCssVars'
 
+// 仅DOM组件
 // DOM-only components
 export { Transition, TransitionProps } from './components/Transition'
 export {
@@ -221,6 +237,7 @@ export {
   TransitionGroupProps
 } from './components/TransitionGroup'
 
+// **内部**仅DOM运行时指令帮助程序
 // **Internal** DOM-only runtime directive helpers
 export {
   vModelText,
@@ -250,6 +267,7 @@ export const initDirectivesForSSR = __SSR__
     }
   : NOOP
 
+// 从核心重新导出所有内容
 // re-export everything from core
 // h, Component, reactivity API, nextTick, flags & types
 export * from '@vue/runtime-core'
